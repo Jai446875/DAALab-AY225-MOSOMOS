@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Calabarzon Route Network Analyzer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;500;600;700&display=swap');
+
+  :root {
+    --bg: #060a12;
+    --surface: #0d1525;
+    --border: #1a2540;
+    --cyan: #00f5ff;
+    --orange: #ff7b00;
+    --green: #39ff6e;
+    --text: #ccdeff;
+    --muted: #4a6080;
+    --glow-cyan: 0 0 20px rgba(0,245,255,0.4);
+    --glow-orange: 0 0 20px rgba(255,123,0,0.4);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    height: 100vh;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,245,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,245,255,0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  /* HEADER */
+  header {
+    position: relative;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 12px 28px;
+    background: rgba(13,21,37,0.95);
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+
+  .brand-icon {
+    width: 38px; height: 38px;
+    border: 2px solid var(--cyan);
+    display: flex; align-items: center; justify-content: center;
+    clip-path: polygon(8px 0%,100% 0%,100% calc(100% - 8px),calc(100% - 8px) 100%,0% 100%,0% 8px);
+    background: rgba(0,245,255,0.08);
+    box-shadow: var(--glow-cyan);
+    flex-shrink: 0;
+  }
+
+  .brand-icon span {
+    font-family: 'Orbitron', monospace;
+    font-weight: 900;
+    font-size: 12px;
+    color: var(--cyan);
+  }
+
+  .brand-text h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--cyan);
+    letter-spacing: 2px;
+    text-shadow: var(--glow-cyan);
+  }
+
+  .brand-text p {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 2px;
+  }
+
+  .header-stats {
+    margin-left: auto;
+    display: flex;
+    gap: 28px;
+  }
+
+  .hstat { text-align: center; }
+  .hstat-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 17px;
+    font-weight: 700;
+    color: var(--cyan);
+    line-height: 1;
+  }
+  .hstat-lbl {
+    font-size: 9px;
+    color: var(--muted);
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    margin-top: 3px;
+  }
+
+  /* MAIN LAYOUT */
+  .layout {
+    position: relative;
+    z-index: 1;
+    display: flex;
+    flex: 1;
+    overflow: hidden;
+  }
+
+  /* SIDEBAR */
+  .sidebar {
+    width: 290px;
+    flex-shrink: 0;
+    background: rgba(13,21,37,0.9);
+    border-right: 1px solid var(--border);
+    display: flex;
+    flex-direction: column;
+    overflow-y: auto;
+  }
+
+  .sidebar::-webkit-scrollbar { width: 3px; }
+  .sidebar::-webkit-scrollbar-thumb { background: var(--border); }
+
+  .panel {
+    padding: 16px 18px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 9px;
+    font-weight: 700;
+    letter-spacing: 3px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .panel-title::before {
+    content: '';
+    width: 3px; height: 11px;
+    background: var(--cyan);
+    display: block;
+    flex-shrink: 0;
+  }
+
+  .form-group { margin-bottom: 10px; }
+  .form-label {
+    font-size: 10px;
+    color: var(--muted);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    margin-bottom: 4px;
+    display: block;
+  }
+
+  select {
+    width: 100%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text);
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 14px;
+    font-weight: 600;
+    padding: 8px 10px;
+    border-radius: 3px;
+    outline: none;
+    cursor: pointer;
+    transition: border-color 0.2s;
+    appearance: none;
+  }
+
+  select:focus, select:hover { border-color: var(--cyan); }
+
+
+  .calc-btn {
+    width: 100%;
+    padding: 12px;
+    background: transparent;
+    border: 1px solid var(--cyan);
+    color: var(--cyan);
+    font-family: 'Orbitron', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    cursor: pointer;
+    border-radius: 3px;
+    transition: all 0.25s;
+    clip-path: polygon(8px 0%,100% 0%,100% calc(100% - 8px),calc(100% - 8px) 100%,0% 100%,0% 8px);
+  }
+
+  .calc-btn:hover {
+    background: var(--cyan);
+    color: var(--bg);
+    box-shadow: var(--glow-cyan);
+  }
+
+  .result-box {
+    margin-top: 12px;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 12px;
+    display: none;
+    animation: fadeIn 0.3s ease;
+  }
+
+  @keyframes fadeIn { from { opacity:0; transform:translateY(-6px); } to { opacity:1; transform:translateY(0); } }
+  .result-box.show { display: block; }
+
+  .res-label {
+    font-family: 'Orbitron', monospace;
+    font-size: 8px;
+    letter-spacing: 2px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-bottom: 7px;
+  }
+
+  .res-path {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--orange);
+    line-height: 1.7;
+    margin-bottom: 10px;
+    word-break: break-word;
+  }
+
+  .res-metrics {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 5px;
+  }
+
+  .metric {
+    background: var(--surface);
+    border-radius: 3px;
+    padding: 7px 8px;
+    text-align: center;
+  }
+
+  .metric-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 14px;
+    font-weight: 700;
+    line-height: 1.2;
+  }
+
+  .c-dist { color: var(--cyan); }
+  .c-time { color: var(--orange); }
+  .c-fuel { color: var(--green); }
+  .c-hops { color: var(--text); }
+
+  .metric-lbl {
+    font-size: 8px;
+    letter-spacing: 1px;
+    color: var(--muted);
+    text-transform: uppercase;
+    margin-top: 3px;
+  }
+
+  /* Edge Table */
+  .edge-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 12px;
+  }
+
+  .edge-table th {
+    font-family: 'Orbitron', monospace;
+    font-size: 8px;
+    letter-spacing: 1px;
+    color: var(--muted);
+    text-align: left;
+    padding: 0 5px 7px;
+    text-transform: uppercase;
+  }
+
+  .edge-table td {
+    padding: 5px;
+    border-top: 1px solid rgba(26,37,64,0.5);
+    color: var(--text);
+    font-weight: 500;
+  }
+
+  .edge-table tr:hover td { background: rgba(0,245,255,0.03); }
+  .edge-table .hl td { color: var(--orange); background: rgba(255,123,0,0.05); }
+
+  /* GRAPH */
+  .graph-wrap {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+  }
+
+  #cvs {
+    display: block;
+    width: 100%;
+    height: 100%;
+    cursor: crosshair;
+  }
+
+  /* Tooltip */
+  #tip {
+    position: absolute;
+    pointer-events: none;
+    background: rgba(13,21,37,0.97);
+    border: 1px solid var(--cyan);
+    border-radius: 4px;
+    padding: 11px 14px;
+    font-size: 13px;
+    opacity: 0;
+    transition: opacity 0.15s;
+    box-shadow: var(--glow-cyan);
+    min-width: 155px;
+    z-index: 100;
+  }
+
+  #tip.show { opacity: 1; }
+  #tip .tip-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--cyan);
+    margin-bottom: 8px;
+    letter-spacing: 1px;
+  }
+
+  #tip .tip-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 14px;
+    color: var(--muted);
+    font-size: 12px;
+    margin-bottom: 3px;
+    font-weight: 500;
+  }
+
+  #tip .tip-row b { color: var(--text); font-weight: 700; }
+
+  /* Corner accents */
+  .ca {
+    position: absolute;
+    width: 18px; height: 18px;
+    pointer-events: none;
+    z-index: 5;
+  }
+  .ca.tl { top:8px; left:8px; border-top:2px solid rgba(0,245,255,0.4); border-left:2px solid rgba(0,245,255,0.4); }
+  .ca.tr { top:8px; right:8px; border-top:2px solid rgba(0,245,255,0.4); border-right:2px solid rgba(0,245,255,0.4); }
+  .ca.bl { bottom:8px; left:8px; border-bottom:2px solid rgba(0,245,255,0.4); border-left:2px solid rgba(0,245,255,0.4); }
+  .ca.br { bottom:8px; right:8px; border-bottom:2px solid rgba(0,245,255,0.4); border-right:2px solid rgba(0,245,255,0.4); }
+
+  /* Legend */
+  .legend-bar {
+    position: absolute;
+    bottom: 12px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 18px;
+    background: rgba(13,21,37,0.88);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 7px 16px;
+    z-index: 5;
+  }
+
+  .li {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--muted);
+    white-space: nowrap;
+  }
+
+  .ld { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+  .ll { width: 18px; height: 2px; flex-shrink: 0; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand-icon"><span>RN</span></div>
+  <div class="brand-text">
+    <h1>ROUTE NETWORK ANALYZER</h1>
+    <p>Calabarzon · Dijkstra Shortest Path</p>
+  </div>
+  <div class="header-stats">
+    <div class="hstat"><div class="hstat-val">8</div><div class="hstat-lbl">Nodes</div></div>
+    <div class="hstat"><div class="hstat-val" id="edge-count">—</div><div class="hstat-lbl">Edges</div></div>
+    <div class="hstat"><div class="hstat-val" style="font-size:11px;letter-spacing:1px;">DIJKSTRA</div><div class="hstat-lbl">Algorithm</div></div>
+  </div>
+</header>
+
+<div class="layout">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+
+    <div class="panel">
+      <div class="panel-title">Shortest Path Finder</div>
+
+      <div class="form-group">
+        <label class="form-label">From Node</label>
+        <select id="sel-from"><option value="">-- Select origin --</option></select>
+      </div>
+
+      <div class="form-group">
+        <label class="form-label">To Node</label>
+        <select id="sel-to"><option value="">-- Select destination --</option></select>
+      </div>
+
+      <button class="calc-btn" onclick="runDijkstra()">&#9654; CALCULATE PATH</button>
+
+      <div class="result-box" id="result-box">
+        <div class="res-label">Optimal Route</div>
+        <div class="res-path" id="res-path"></div>
+        <div class="res-metrics" id="res-metrics"></div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Legend</div>
+      <div style="display:flex;flex-direction:column;gap:8px;">
+        <div class="li"><div class="ld" style="background:var(--cyan);box-shadow:0 0 8px rgba(0,245,255,0.6)"></div>Node (location)</div>
+        <div class="li"><div class="ld" style="background:var(--orange)"></div>Node on shortest path</div>
+        <div class="li"><div class="ll" style="background:rgba(74,96,128,0.7);border-top:2px dashed rgba(74,96,128,0.7)"></div>Route edge</div>
+        <div class="li"><div class="ll" style="background:var(--orange);height:3px"></div>Shortest path edge</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:4px;line-height:1.9;">
+          &#9656; Hover nodes / edges for details<br>
+          &#9656; Drag nodes to reposition<br>
+          &#9656; Edge labels show distance (km)
+        </div>
+      </div>
+    </div>
+
+    <div class="panel" style="flex:1;">
+      <div class="panel-title">All Connections</div>
+      <table class="edge-table">
+        <thead>
+          <tr><th>From</th><th>To</th><th>km</th><th>min</th><th>L</th></tr>
+        </thead>
+        <tbody id="edge-tbody"></tbody>
+      </table>
+    </div>
+
+  </aside>
+
+  <!-- GRAPH AREA -->
+  <div class="graph-wrap" id="graph-wrap">
+    <div class="ca tl"></div>
+    <div class="ca tr"></div>
+    <div class="ca bl"></div>
+    <div class="ca br"></div>
+    <canvas id="cvs"></canvas>
+    <div id="tip"></div>
+    <div class="legend-bar">
+      <div class="li"><div class="ld" style="background:var(--cyan)"></div>Node</div>
+      <div class="li"><div class="ld" style="background:var(--orange)"></div>On Path</div>
+      <div class="li"><div class="ll" style="background:rgba(74,96,128,0.6)"></div>Route Edge</div>
+      <div class="li"><div class="ll" style="background:var(--orange);height:3px"></div>Shortest Path</div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ═══════════════════════════════════════
+//  DATA
+// ═══════════════════════════════════════
+const EDGES = [
+  {from:"IMUS",    to:"BACOOR",   distance:10, time:15, fuel:1.2},
+  {from:"BACOOR",  to:"DASMA",    distance:12, time:25, fuel:1.5},
+  {from:"DASMA",   to:"KAWIT",    distance:12, time:25, fuel:1.5},
+  {from:"KAWIT",   to:"INDANG",   distance:12, time:25, fuel:1.2},
+  {from:"INDANG",  to:"SILANG",   distance:14, time:25, fuel:1.5},
+  {from:"SILANG",  to:"GENTRI",   distance:10, time:25, fuel:1.3},
+  {from:"GENTRI",  to:"NOVELETA", distance:10, time:25, fuel:1.5},
+  {from:"NOVELETA",to:"IMUS",     distance:10, time:15, fuel:1.2},
+  {from:"BACOOR",  to:"SILANG",   distance:10, time:25, fuel:1.3},
+  {from:"DASMA",   to:"SILANG",   distance:12, time:25, fuel:1.5},
+  {from:"SILANG",  to:"BACOOR",   distance:10, time:25, fuel:1.3},
+  {from:"NOVELETA",to:"BACOOR",   distance:10, time:15, fuel:1.2},
+  {from:"SILANG",  to:"KAWIT",    distance:14, time:25, fuel:1.2},
+  {from:"IMUS",    to:"NOVELETA", distance:10, time:15, fuel:1.2},
+];
+
+const NODES = [...new Set(EDGES.flatMap(e => [e.from, e.to]))];
+
+// ═══════════════════════════════════════
+//  BUILD ADJACENCY LIST
+// ═══════════════════════════════════════
+function buildAdj() {
+  const adj = {};
+  NODES.forEach(n => adj[n] = []);
+  // Add both directions so the graph is undirected
+  const seen = new Set();
+  EDGES.forEach(e => {
+    adj[e.from].push(e);
+    const revKey = `${e.to}|${e.from}`;
+    if (!seen.has(revKey)) {
+      adj[e.to].push({from: e.to, to: e.from, distance: e.distance, time: e.time, fuel: e.fuel});
+    }
+    seen.add(`${e.from}|${e.to}`);
+  });
+  return adj;
+}
+const ADJ = buildAdj();
+
+// ═══════════════════════════════════════
+//  DIJKSTRA ALGORITHM
+// ═══════════════════════════════════════
+function dijkstra(start, end, wKey) {
+  const dist = {}, prev = {};
+  NODES.forEach(n => dist[n] = Infinity);
+  dist[start] = 0;
+  const visited = new Set();
+  const pq = [{node: start, cost: 0}];
+
+  while (pq.length > 0) {
+    pq.sort((a, b) => a.cost - b.cost);
+    const {node} = pq.shift();
+    if (visited.has(node)) continue;
+    visited.add(node);
+    if (node === end) break;
+    for (const edge of (ADJ[node] || [])) {
+      const nc = dist[node] + edge[wKey];
+      if (nc < dist[edge.to]) {
+        dist[edge.to] = nc;
+        prev[edge.to] = {fromNode: node, edge};
+        pq.push({node: edge.to, cost: nc});
+      }
+    }
+  }
+
+  if (dist[end] === Infinity) return null;
+
+  // Reconstruct path
+  const path = [], usedEdges = [];
+  let cur = end;
+  while (cur !== start) {
+    const p = prev[cur];
+    path.unshift(cur);
+    usedEdges.unshift(p.edge);
+    cur = p.fromNode;
+  }
+  path.unshift(start);
+
+  return {
+    path,
+    usedEdges,
+    totDist: usedEdges.reduce((s, e) => s + e.distance, 0),
+    totTime: usedEdges.reduce((s, e) => s + e.time, 0),
+    totFuel: +usedEdges.reduce((s, e) => s + e.fuel, 0).toFixed(1),
+  };
+}
+
+// ═══════════════════════════════════════
+//  STATE
+// ═══════════════════════════════════════
+let currentResult = null;
+let pathEdgeSet   = new Set();
+let pathNodeSet   = new Set();
+
+// ═══════════════════════════════════════
+//  UI FUNCTIONS
+// ═══════════════════════════════════════
+function populateSelects() {
+  const sf = document.getElementById('sel-from');
+  const st = document.getElementById('sel-to');
+  NODES.forEach(n => {
+    sf.innerHTML += `<option value="${n}">${n}</option>`;
+    st.innerHTML += `<option value="${n}">${n}</option>`;
+  });
+}
+
+function runDijkstra() {
+  const from = document.getElementById('sel-from').value;
+  const to   = document.getElementById('sel-to').value;
+  if (!from || !to) { alert('Please select both From and To nodes.'); return; }
+  if (from === to)  { alert('Origin and destination must be different.'); return; }
+
+  const result = dijkstra(from, to, 'distance');
+  currentResult = result;
+  pathEdgeSet = new Set();
+  pathNodeSet = new Set();
+
+  const box = document.getElementById('result-box');
+  box.classList.add('show');
+
+  if (!result) {
+    document.getElementById('res-path').textContent = 'No path found.';
+    document.getElementById('res-metrics').innerHTML = '';
+    buildEdgeTable();
+    drawGraph();
+    return;
+  }
+
+  result.path.forEach(n => pathNodeSet.add(n));
+  result.usedEdges.forEach(e => {
+    const key = [e.from, e.to].sort().join('|');
+    pathEdgeSet.add(key);
+  });
+
+  document.getElementById('res-path').innerHTML =
+    result.path.join(' <span style="color:var(--muted)">→</span> ');
+
+  document.getElementById('res-metrics').innerHTML = `
+    <div class="metric"><div class="metric-val c-dist">${result.totDist} km</div><div class="metric-lbl">Distance</div></div>
+    <div class="metric"><div class="metric-val c-time">${result.totTime} min</div><div class="metric-lbl">Time</div></div>
+    <div class="metric"><div class="metric-val c-fuel">${result.totFuel} L</div><div class="metric-lbl">Fuel</div></div>
+    <div class="metric"><div class="metric-val c-hops">${result.path.length}</div><div class="metric-lbl">Nodes</div></div>
+  `;
+
+  buildEdgeTable();
+  drawGraph();
+}
+
+function buildEdgeTable() {
+  document.getElementById('edge-tbody').innerHTML = EDGES.map(e => {
+    const key = [e.from, e.to].sort().join('|');
+    const hl = pathEdgeSet.has(key) ? ' class="hl"' : '';
+    return `<tr${hl}><td>${e.from}</td><td>${e.to}</td><td>${e.distance}</td><td>${e.time}</td><td>${e.fuel}</td></tr>`;
+  }).join('');
+}
+
+// ═══════════════════════════════════════
+//  CANVAS / GRAPH DRAWING
+// ═══════════════════════════════════════
+const canvas  = document.getElementById('cvs');
+const ctx     = canvas.getContext('2d');
+const tip     = document.getElementById('tip');
+
+// Node positions (relative ratios) — well spread
+const LAYOUT = {
+  NOVELETA: {rx:0.13, ry:0.45},
+  IMUS:     {rx:0.30, ry:0.20},
+  BACOOR:   {rx:0.50, ry:0.12},
+  DASMA:    {rx:0.72, ry:0.20},
+  KAWIT:    {rx:0.30, ry:0.65},
+  SILANG:   {rx:0.65, ry:0.58},
+  INDANG:   {rx:0.45, ry:0.84},
+  GENTRI:   {rx:0.82, ry:0.80},
+};
+
+let nodePos = {};
+const NR = 36;    // node radius — fits longest names like NOVELETA/BACOOR
+let dragging = null, dox = 0, doy = 0;
+
+function initPositions() {
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  NODES.forEach(n => {
+    const l = LAYOUT[n] || {rx:0.5, ry:0.5};
+    nodePos[n] = {x: l.rx * W, y: l.ry * H};
+  });
+}
+
+function resizeCanvas() {
+  const wrap = document.getElementById('graph-wrap');
+  const dpr  = window.devicePixelRatio || 1;
+  const W = wrap.clientWidth, H = wrap.clientHeight;
+  canvas.width  = W * dpr;
+  canvas.height = H * dpr;
+  canvas.style.width  = W + 'px';
+  canvas.style.height = H + 'px';
+  ctx.scale(dpr, dpr);
+  initPositions();
+  drawGraph();
+}
+
+// Build unique undirected edge list for drawing (avoid drawing A-B and B-A twice)
+function getUniqueEdges() {
+  const seen = new Set();
+  const unique = [];
+  EDGES.forEach(e => {
+    const key = [e.from, e.to].sort().join('|');
+    if (!seen.has(key)) {
+      seen.add(key);
+      unique.push(e);
+    }
+  });
+  return unique;
+}
+const DRAW_EDGES = getUniqueEdges();
+
+function drawGraph() {
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  ctx.clearRect(0, 0, W, H);
+
+  // ── Edges ──
+  DRAW_EDGES.forEach(e => {
+    const a = nodePos[e.from], b = nodePos[e.to];
+    if (!a || !b) return;
+    const key  = [e.from, e.to].sort().join('|');
+    const isP  = pathEdgeSet.has(key);
+    const col  = isP ? '#ff7b00' : 'rgba(74,96,128,0.5)';
+
+    // Draw straight line
+    ctx.beginPath();
+    ctx.moveTo(a.x, a.y);
+    ctx.lineTo(b.x, b.y);
+    ctx.strokeStyle = col;
+    ctx.lineWidth   = isP ? 3 : 1.5;
+    if (!isP) ctx.setLineDash([6, 6]);
+    else      ctx.setLineDash([]);
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Edge distance label (offset perpendicularly)
+    const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len = Math.sqrt(dx*dx + dy*dy) || 1;
+    const ox = -dy / len * 13, oy = dx / len * 13;
+    ctx.font         = isP ? 'bold 11px Rajdhani, sans-serif' : '10px Rajdhani, sans-serif';
+    ctx.fillStyle    = isP ? '#ffaa55' : 'rgba(100,130,180,0.9)';
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText(`${e.distance}km`, mx + ox, my + oy);
+  });
+
+  // ── Nodes ──
+  NODES.forEach(name => {
+    const p = nodePos[name];
+    if (!p) return;
+    const isP  = pathNodeSet.has(name);
+    const col  = isP ? '#ff7b00' : '#00f5ff';
+    const glow = isP ? 'rgba(255,123,0,0.45)' : 'rgba(0,245,255,0.35)';
+
+    // Outer glow
+    const g = ctx.createRadialGradient(p.x, p.y, NR - 4, p.x, p.y, NR + 16);
+    g.addColorStop(0, glow);
+    g.addColorStop(1, 'transparent');
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, NR + 16, 0, Math.PI * 2);
+    ctx.fillStyle = g;
+    ctx.fill();
+
+    // Fill
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, NR, 0, Math.PI * 2);
+    ctx.fillStyle = isP ? 'rgba(255,123,0,0.14)' : 'rgba(0,245,255,0.09)';
+    ctx.fill();
+
+    // Stroke
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, NR, 0, Math.PI * 2);
+    ctx.strokeStyle = col;
+    ctx.lineWidth   = isP ? 2.5 : 1.8;
+    ctx.stroke();
+
+    // Inner ring
+    ctx.beginPath();
+    ctx.arc(p.x, p.y, NR - 7, 0, Math.PI * 2);
+    ctx.strokeStyle = isP ? 'rgba(255,123,0,0.35)' : 'rgba(0,245,255,0.25)';
+    ctx.lineWidth   = 1;
+    ctx.stroke();
+
+    // Label — single line, font sized to fit inside circle
+    ctx.fillStyle    = col;
+    ctx.textAlign    = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = name.length <= 5 ? 'bold 11px Orbitron, monospace'
+             : name.length <= 7 ? 'bold 9px Orbitron, monospace'
+             :                    'bold 8px Orbitron, monospace';
+    ctx.fillText(name, p.x, p.y);
+  });
+}
+
+// ── Hit testing ──
+function nodeAt(x, y) {
+  for (const n of NODES) {
+    const p = nodePos[n];
+    if (!p) continue;
+    const dx = p.x - x, dy = p.y - y;
+    if (dx*dx + dy*dy <= (NR + 5) * (NR + 5)) return n;
+  }
+  return null;
+}
+
+function edgeAt(x, y) {
+  for (const e of DRAW_EDGES) {
+    const a = nodePos[e.from], b = nodePos[e.to];
+    if (!a || !b) continue;
+    const dx = b.x - a.x, dy = b.y - a.y;
+    const len2 = dx*dx + dy*dy;
+    const t = Math.max(0, Math.min(1, ((x-a.x)*dx + (y-a.y)*dy) / len2));
+    const px = a.x + t*dx - x, py = a.y + t*dy - y;
+    if (px*px + py*py < 100 && t > 0.15 && t < 0.85) return e;
+  }
+  return null;
+}
+
+function showTip(x, y, html) {
+  tip.innerHTML = html;
+  const rect = canvas.getBoundingClientRect();
+  const W = canvas.clientWidth, H = canvas.clientHeight;
+  const tw = 170, th = 100;
+  const lx = x + 18 + tw > W ? x - tw - 14 : x + 18;
+  const ly = y + th > H ? y - th : y;
+  tip.style.left = lx + 'px';
+  tip.style.top  = ly + 'px';
+  tip.classList.add('show');
+}
+
+function hideTip() { tip.classList.remove('show'); }
+
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+
+  if (dragging) {
+    nodePos[dragging] = {x: x - dox, y: y - doy};
+    drawGraph();
+    return;
+  }
+
+  const node = nodeAt(x, y);
+  if (node) {
+    canvas.style.cursor = 'grab';
+    const total = DRAW_EDGES.filter(e => e.from === node || e.to === node).length;
+    showTip(x, y, `
+      <div class="tip-title">${node}</div>
+      <div class="tip-row">Total Connections <b>${total}</b></div>
+    `);
+    return;
+  }
+
+  const edge = edgeAt(x, y);
+  if (edge) {
+    canvas.style.cursor = 'pointer';
+    showTip(x, y, `
+      <div class="tip-title">${edge.from} → ${edge.to}</div>
+      <div class="tip-row">Distance <b>${edge.distance} km</b></div>
+      <div class="tip-row">Time <b>${edge.time} min</b></div>
+      <div class="tip-row">Fuel <b>${edge.fuel} L</b></div>
+    `);
+    return;
+  }
+
+  canvas.style.cursor = 'crosshair';
+  hideTip();
+});
+
+canvas.addEventListener('mousedown', e => {
+  const rect = canvas.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const n = nodeAt(x, y);
+  if (n) { dragging = n; dox = x - nodePos[n].x; doy = y - nodePos[n].y; }
+});
+
+canvas.addEventListener('mouseup',    () => { dragging = null; canvas.style.cursor = 'crosshair'; });
+canvas.addEventListener('mouseleave', () => { dragging = null; hideTip(); });
+
+// ═══════════════════════════════════════
+//  INIT
+// ═══════════════════════════════════════
+populateSelects();
+buildEdgeTable();
+document.getElementById('edge-count').textContent = DRAW_EDGES.length;
+resizeCanvas();
+window.addEventListener('resize', resizeCanvas);
+</script>
+</body>
+</html>
