@@ -396,6 +396,35 @@
 
   .ld { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
   .ll { width: 18px; height: 2px; flex-shrink: 0; }
+
+  /* Q&A */
+  .qa-item {
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    margin-bottom: 7px;
+    overflow: hidden;
+  }
+  .qa-q {
+    padding: 9px 11px;
+    background: var(--bg);
+    cursor: pointer;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--cyan);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    line-height: 1.5;
+    transition: background 0.2s;
+    user-select: none;
+  }
+  .qa-q:hover { background: rgba(0,245,255,0.06); }
+  .qa-arrow { flex-shrink:0; font-size:9px; margin-top:2px; transition: transform 0.25s; color: var(--muted); }
+  .qa-item.open .qa-arrow { transform: rotate(90deg); color: var(--cyan); }
+  .qa-a { max-height: 0; overflow: hidden; transition: max-height 0.35s ease; background: rgba(0,245,255,0.03); }
+  .qa-a-inner { padding: 10px 11px; font-size: 11px; color: var(--text); line-height: 1.75; }
+  .qa-item.open .qa-a { max-height: 500px; }
 </style>
 </head>
 <body>
@@ -453,6 +482,14 @@
           &#9656; Edge labels show distance (km)
         </div>
       </div>
+    </div>
+
+    <div class="panel" id="qa-panel">
+      <div class="panel-title" onclick="toggleQAPanel()" style="cursor:pointer; justify-content:space-between; user-select:none;">
+        <span>Q &amp; A</span>
+        <span id="qa-panel-arrow" style="font-size:9px; color:var(--muted); transition: transform 0.25s; display:inline-block;">&#9654;</span>
+      </div>
+      <div id="qa-list" style="display:none;"></div>
     </div>
 
     <div class="panel" style="flex:1;">
@@ -874,10 +911,80 @@ canvas.addEventListener('mousedown', e => {
 canvas.addEventListener('mouseup',    () => { dragging = null; canvas.style.cursor = 'crosshair'; });
 canvas.addEventListener('mouseleave', () => { dragging = null; hideTip(); });
 
-// ═══════════════════════════════════════
-//  INIT
-// ═══════════════════════════════════════
+
+const QA = [
+  {
+    q: "What is a node map and how does it work here?",
+    a: "A node map is a visual graph where each circle (node) represents a city and each line (edge) represents a road connection between two cities. Here, 8 cities are drawn on an HTML5 Canvas using JavaScript. Each node is placed at a fixed position on the screen, and lines are drawn between nodes that have a connection in the data table."
+  },
+  {
+    q: "How are the edges drawn on the canvas?",
+    a: "Each edge is drawn using ctx.beginPath(), ctx.moveTo(x1,y1), and ctx.lineTo(x2,y2) on the HTML5 Canvas API. Before drawing, duplicate bidirectional pairs (e.g. BACOOR↔SILANG listed twice) are removed using a canonical key: [from, to].sort().join('|'). This ensures each connection is only drawn once as a single undirected line."
+  },
+  {
+    q: "Why is the graph undirected if the table has directional rows?",
+    a: "Roads between cities can naturally be traveled both ways. The original table listed some routes in both directions as separate rows (e.g. BACOOR→SILANG and SILANG→BACOOR). To reflect real-world travel, the adjacency list was made bidirectional — every edge adds both forward and reverse directions — so Dijkstra can find the true shortest path regardless of which direction was listed in the table."
+  },
+  {
+    q: "How does Dijkstra's Algorithm calculate the shortest path?",
+    a: "Dijkstra's sets all node distances to Infinity except the start node (distance = 0). It uses a priority queue — always processing the lowest-cost unvisited node next. For each neighbor, it checks if traveling through the current node gives a shorter distance. If yes, it updates the distance and records which node it came from. Once the destination is reached, it reconstructs the path by tracing backwards through those recorded nodes."
+  },
+  {
+    q: "How is the total distance, time, and fuel computed?",
+    a: "After Dijkstra reconstructs the path, the program collects all the edges used. It then sums up each attribute across those edges: totDist = edges.reduce((sum, e) => sum + e.distance, 0), and the same for time and fuel. This gives the exact total cost of traveling the shortest route."
+  },
+  {
+    q: "What does the 'Nodes' count in the result mean?",
+    a: "It shows how many city nodes are visited along the shortest path, including the start and end. For example, INDANG → BACOOR → IMUS has 3 nodes. This is calculated as path.length, where path is the ordered array of node names from source to destination."
+  },
+  {
+    q: "How does hovering on a node or edge work?",
+    a: "On every mouse move, the program checks if the cursor is within range of a node (using distance formula: dx²+dy² ≤ radius²) or near an edge (using point-to-line distance). If a match is found, a tooltip div is shown at the cursor position with the relevant data. If no match is found, the tooltip is hidden."
+  },
+  {
+    q: "How does dragging a node work?",
+    a: "On mousedown, the program checks if the cursor is over a node. If yes, it stores that node's name and the offset between the cursor and node center. On every mousemove while dragging, the node's position is updated to the current cursor position minus that offset. On mouseup, dragging stops. drawGraph() is called every frame to redraw everything at the new positions."
+  },
+  {
+    q: "Why are there 12 edges shown but 14 rows in the table?",
+    a: "Because 2 pairs of routes appear twice in opposite directions: BACOOR↔SILANG and IMUS↔NOVELETA. Since the graph is undirected, these count as 1 edge each. The program deduplicates them by sorting the node names alphabetically to create a unique key per pair, reducing 14 table rows to 12 unique visual edges."
+  },
+  {
+    q: "What happens if there is no path between two nodes?",
+    a: "Dijkstra will never reach the destination node, so its distance stays Infinity. The function returns null, and the result panel displays 'No path found.' In this graph all nodes are reachable from any other node since the graph is fully connected and undirected, so this case won't occur here."
+  },
+];
+
+function buildQA() {
+  const container = document.getElementById('qa-list');
+  container.innerHTML = QA.map((item, i) => `
+    <div class="qa-item" id="qa-${i}">
+      <div class="qa-q" onclick="toggleQA(${i})">
+        <span>${item.q}</span>
+        <span class="qa-arrow">&#9654;</span>
+      </div>
+      <div class="qa-a">
+        <div class="qa-a-inner">${item.a}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function toggleQA(i) {
+  document.getElementById(`qa-${i}`).classList.toggle('open');
+}
+
+function toggleQAPanel() {
+  const list  = document.getElementById('qa-list');
+  const arrow = document.getElementById('qa-panel-arrow');
+  const isHidden = list.style.display === 'none';
+  list.style.display    = isHidden ? 'block' : 'none';
+  arrow.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
+}
+
+
 populateSelects();
+buildQA();
 buildEdgeTable();
 document.getElementById('edge-count').textContent = DRAW_EDGES.length;
 resizeCanvas();
