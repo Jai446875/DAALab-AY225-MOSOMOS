@@ -526,6 +526,8 @@
 // ═══════════════════════════════════════
 //  DATA
 // ═══════════════════════════════════════
+
+// All 14 road connections from the table, each with distance, time, and fuel
 const EDGES = [
   {from:"IMUS",    to:"BACOOR",   distance:10, time:15, fuel:1.2},
   {from:"BACOOR",  to:"DASMA",    distance:12, time:25, fuel:1.5},
@@ -543,20 +545,24 @@ const EDGES = [
   {from:"IMUS",    to:"NOVELETA", distance:10, time:15, fuel:1.2},
 ];
 
+// Extract unique node names from all from/to values using Set to avoid duplicates
 const NODES = [...new Set(EDGES.flatMap(e => [e.from, e.to]))];
 
 // ═══════════════════════════════════════
 //  BUILD ADJACENCY LIST
 // ═══════════════════════════════════════
+
+// Creates a lookup: adj["IMUS"] = [all edges connected to IMUS]
+// Also adds reverse direction so the graph is undirected (travel both ways)
 function buildAdj() {
   const adj = {};
-  NODES.forEach(n => adj[n] = []);
-  // Add both directions so the graph is undirected
+  NODES.forEach(n => adj[n] = []); // start each node with empty array
   const seen = new Set();
   EDGES.forEach(e => {
-    adj[e.from].push(e);
+    adj[e.from].push(e); // add forward edge
     const revKey = `${e.to}|${e.from}`;
     if (!seen.has(revKey)) {
+      // add reverse edge so you can travel the other way too
       adj[e.to].push({from: e.to, to: e.from, distance: e.distance, time: e.time, fuel: e.fuel});
     }
     seen.add(`${e.from}|${e.to}`);
@@ -568,61 +574,71 @@ const ADJ = buildAdj();
 // ═══════════════════════════════════════
 //  DIJKSTRA ALGORITHM
 // ═══════════════════════════════════════
+
 function dijkstra(start, end, wKey) {
   const dist = {}, prev = {};
+
+  // Set every node's distance to Infinity (unknown), except start = 0
   NODES.forEach(n => dist[n] = Infinity);
   dist[start] = 0;
+
   const visited = new Set();
-  const pq = [{node: start, cost: 0}];
+  const pq = [{node: start, cost: 0}]; // priority queue starts at source
 
   while (pq.length > 0) {
-    pq.sort((a, b) => a.cost - b.cost);
+    pq.sort((a, b) => a.cost - b.cost); // always pick cheapest node next
     const {node} = pq.shift();
-    if (visited.has(node)) continue;
+    if (visited.has(node)) continue;    // skip if already processed
     visited.add(node);
-    if (node === end) break;
+    if (node === end) break;            // stop early once destination is reached
+
+    // Check all neighbors of the current node
     for (const edge of (ADJ[node] || [])) {
-      const nc = dist[node] + edge[wKey];
+      const nc = dist[node] + edge[wKey]; // tentative cost through current node
       if (nc < dist[edge.to]) {
-        dist[edge.to] = nc;
-        prev[edge.to] = {fromNode: node, edge};
+        dist[edge.to] = nc;                        // found a shorter path, update it
+        prev[edge.to] = {fromNode: node, edge};    // remember where we came from
         pq.push({node: edge.to, cost: nc});
       }
     }
   }
 
+  // No path exists if destination is still Infinity
   if (dist[end] === Infinity) return null;
 
-  // Reconstruct path
+  // Walk backwards from end to start using prev to rebuild the path
   const path = [], usedEdges = [];
   let cur = end;
   while (cur !== start) {
     const p = prev[cur];
-    path.unshift(cur);
-    usedEdges.unshift(p.edge);
+    path.unshift(cur);        // prepend node to path
+    usedEdges.unshift(p.edge); // prepend edge used
     cur = p.fromNode;
   }
-  path.unshift(start);
+  path.unshift(start); // add the start node at the beginning
 
   return {
     path,
     usedEdges,
-    totDist: usedEdges.reduce((s, e) => s + e.distance, 0),
-    totTime: usedEdges.reduce((s, e) => s + e.time, 0),
-    totFuel: +usedEdges.reduce((s, e) => s + e.fuel, 0).toFixed(1),
+    totDist: usedEdges.reduce((s, e) => s + e.distance, 0), // sum all distances
+    totTime: usedEdges.reduce((s, e) => s + e.time, 0),     // sum all times
+    totFuel: +usedEdges.reduce((s, e) => s + e.fuel, 0).toFixed(1), // sum all fuel
   };
 }
 
 // ═══════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════
-let currentResult = null;
-let pathEdgeSet   = new Set();
-let pathNodeSet   = new Set();
+
+let currentResult = null;       // stores last Dijkstra result
+let pathEdgeSet   = new Set();  // canonical keys of edges on the current path
+let pathNodeSet   = new Set();  // node names on the current path
 
 // ═══════════════════════════════════════
 //  UI FUNCTIONS
 // ═══════════════════════════════════════
+
+// Fill the From and To dropdowns with all node names
 function populateSelects() {
   const sf = document.getElementById('sel-from');
   const st = document.getElementById('sel-to');
@@ -632,19 +648,20 @@ function populateSelects() {
   });
 }
 
+// Triggered by the Calculate Path button
 function runDijkstra() {
   const from = document.getElementById('sel-from').value;
   const to   = document.getElementById('sel-to').value;
   if (!from || !to) { alert('Please select both From and To nodes.'); return; }
   if (from === to)  { alert('Origin and destination must be different.'); return; }
 
-  const result = dijkstra(from, to, 'distance');
+  const result = dijkstra(from, to, 'distance'); // run Dijkstra by distance
   currentResult = result;
-  pathEdgeSet = new Set();
-  pathNodeSet = new Set();
+  pathEdgeSet = new Set(); // reset highlighted edges
+  pathNodeSet = new Set(); // reset highlighted nodes
 
   const box = document.getElementById('result-box');
-  box.classList.add('show');
+  box.classList.add('show'); // show the result panel
 
   if (!result) {
     document.getElementById('res-path').textContent = 'No path found.';
@@ -654,15 +671,18 @@ function runDijkstra() {
     return;
   }
 
+  // Store which nodes and edges are on the path for highlighting
   result.path.forEach(n => pathNodeSet.add(n));
   result.usedEdges.forEach(e => {
-    const key = [e.from, e.to].sort().join('|');
+    const key = [e.from, e.to].sort().join('|'); // canonical key ignores direction
     pathEdgeSet.add(key);
   });
 
+  // Display the path as a chain e.g. "IMUS → BACOOR → SILANG"
   document.getElementById('res-path').innerHTML =
     result.path.join(' <span style="color:var(--muted)">→</span> ');
 
+  // Display total distance, time, fuel, and node count
   document.getElementById('res-metrics').innerHTML = `
     <div class="metric"><div class="metric-val c-dist">${result.totDist} km</div><div class="metric-lbl">Distance</div></div>
     <div class="metric"><div class="metric-val c-time">${result.totTime} min</div><div class="metric-lbl">Time</div></div>
@@ -674,6 +694,7 @@ function runDijkstra() {
   drawGraph();
 }
 
+// Renders the connections table, highlighting rows that are on the current path
 function buildEdgeTable() {
   document.getElementById('edge-tbody').innerHTML = EDGES.map(e => {
     const key = [e.from, e.to].sort().join('|');
@@ -686,10 +707,10 @@ function buildEdgeTable() {
 //  CANVAS / GRAPH DRAWING
 // ═══════════════════════════════════════
 const canvas  = document.getElementById('cvs');
-const ctx     = canvas.getContext('2d');
+const ctx     = canvas.getContext('2d'); // 2D drawing context
 const tip     = document.getElementById('tip');
 
-// Node positions (relative ratios) — well spread
+// Relative positions (0–1) for each node on the canvas
 const LAYOUT = {
   NOVELETA: {rx:0.13, ry:0.45},
   IMUS:     {rx:0.30, ry:0.20},
@@ -701,10 +722,11 @@ const LAYOUT = {
   GENTRI:   {rx:0.82, ry:0.80},
 };
 
-let nodePos = {};
-const NR = 36;    // node radius — fits longest names like NOVELETA/BACOOR
-let dragging = null, dox = 0, doy = 0;
+let nodePos = {};          // actual pixel positions, computed from LAYOUT ratios
+const NR = 36;             // node circle radius in pixels
+let dragging = null, dox = 0, doy = 0; // drag state
 
+// Convert relative ratios to real pixel positions based on canvas size
 function initPositions() {
   const W = canvas.clientWidth, H = canvas.clientHeight;
   NODES.forEach(n => {
@@ -713,6 +735,7 @@ function initPositions() {
   });
 }
 
+// Resize canvas to match its container, accounting for device pixel ratio (sharp on retina)
 function resizeCanvas() {
   const wrap = document.getElementById('graph-wrap');
   const dpr  = window.devicePixelRatio || 1;
@@ -726,12 +749,13 @@ function resizeCanvas() {
   drawGraph();
 }
 
-// Build unique undirected edge list for drawing (avoid drawing A-B and B-A twice)
+// Remove duplicate bidirectional pairs so each edge is drawn only once
+// e.g. BACOOR→SILANG and SILANG→BACOOR become one entry
 function getUniqueEdges() {
   const seen = new Set();
   const unique = [];
   EDGES.forEach(e => {
-    const key = [e.from, e.to].sort().join('|');
+    const key = [e.from, e.to].sort().join('|'); // same key regardless of direction
     if (!seen.has(key)) {
       seen.add(key);
       unique.push(e);
@@ -739,36 +763,36 @@ function getUniqueEdges() {
   });
   return unique;
 }
-const DRAW_EDGES = getUniqueEdges();
+const DRAW_EDGES = getUniqueEdges(); // 12 unique edges used for drawing
 
 function drawGraph() {
   const W = canvas.clientWidth, H = canvas.clientHeight;
-  ctx.clearRect(0, 0, W, H);
+  ctx.clearRect(0, 0, W, H); // wipe the canvas before redrawing
 
-  // ── Edges ──
+  // ── Draw Edges ──
   DRAW_EDGES.forEach(e => {
     const a = nodePos[e.from], b = nodePos[e.to];
     if (!a || !b) return;
-    const key  = [e.from, e.to].sort().join('|');
-    const isP  = pathEdgeSet.has(key);
-    const col  = isP ? '#ff7b00' : 'rgba(74,96,128,0.5)';
+    const key = [e.from, e.to].sort().join('|');
+    const isP = pathEdgeSet.has(key);          // is this edge on the shortest path?
+    const col = isP ? '#ff7b00' : 'rgba(74,96,128,0.5)'; // orange if on path, grey otherwise
 
-    // Draw straight line
+    // Draw the line between the two nodes
     ctx.beginPath();
     ctx.moveTo(a.x, a.y);
     ctx.lineTo(b.x, b.y);
     ctx.strokeStyle = col;
-    ctx.lineWidth   = isP ? 3 : 1.5;
-    if (!isP) ctx.setLineDash([6, 6]);
+    ctx.lineWidth   = isP ? 3 : 1.5;        // thicker if on path
+    if (!isP) ctx.setLineDash([6, 6]);       // dashed for non-path edges
     else      ctx.setLineDash([]);
     ctx.stroke();
     ctx.setLineDash([]);
 
-    // Edge distance label (offset perpendicularly)
+    // Draw distance label perpendicular to the edge midpoint
     const mx = (a.x + b.x) / 2, my = (a.y + b.y) / 2;
     const dx = b.x - a.x, dy = b.y - a.y;
     const len = Math.sqrt(dx*dx + dy*dy) || 1;
-    const ox = -dy / len * 13, oy = dx / len * 13;
+    const ox = -dy / len * 13, oy = dx / len * 13; // perpendicular offset
     ctx.font         = isP ? 'bold 11px Rajdhani, sans-serif' : '10px Rajdhani, sans-serif';
     ctx.fillStyle    = isP ? '#ffaa55' : 'rgba(100,130,180,0.9)';
     ctx.textAlign    = 'center';
@@ -776,15 +800,15 @@ function drawGraph() {
     ctx.fillText(`${e.distance}km`, mx + ox, my + oy);
   });
 
-  // ── Nodes ──
+  // ── Draw Nodes ──
   NODES.forEach(name => {
     const p = nodePos[name];
     if (!p) return;
-    const isP  = pathNodeSet.has(name);
-    const col  = isP ? '#ff7b00' : '#00f5ff';
+    const isP  = pathNodeSet.has(name);           // is this node on the path?
+    const col  = isP ? '#ff7b00' : '#00f5ff';     // orange if on path, cyan otherwise
     const glow = isP ? 'rgba(255,123,0,0.45)' : 'rgba(0,245,255,0.35)';
 
-    // Outer glow
+    // Outer glow using radial gradient
     const g = ctx.createRadialGradient(p.x, p.y, NR - 4, p.x, p.y, NR + 16);
     g.addColorStop(0, glow);
     g.addColorStop(1, 'transparent');
@@ -793,27 +817,27 @@ function drawGraph() {
     ctx.fillStyle = g;
     ctx.fill();
 
-    // Fill
+    // Filled circle background
     ctx.beginPath();
     ctx.arc(p.x, p.y, NR, 0, Math.PI * 2);
     ctx.fillStyle = isP ? 'rgba(255,123,0,0.14)' : 'rgba(0,245,255,0.09)';
     ctx.fill();
 
-    // Stroke
+    // Outer border ring
     ctx.beginPath();
     ctx.arc(p.x, p.y, NR, 0, Math.PI * 2);
     ctx.strokeStyle = col;
     ctx.lineWidth   = isP ? 2.5 : 1.8;
     ctx.stroke();
 
-    // Inner ring
+    // Inner decorative ring
     ctx.beginPath();
     ctx.arc(p.x, p.y, NR - 7, 0, Math.PI * 2);
     ctx.strokeStyle = isP ? 'rgba(255,123,0,0.35)' : 'rgba(0,245,255,0.25)';
     ctx.lineWidth   = 1;
     ctx.stroke();
 
-    // Label — single line, font sized to fit inside circle
+    // Node name label — font size scales down for longer names
     ctx.fillStyle    = col;
     ctx.textAlign    = 'center';
     ctx.textBaseline = 'middle';
@@ -824,35 +848,40 @@ function drawGraph() {
   });
 }
 
-// ── Hit testing ──
+// ── Hit Testing ──
+
+// Returns the node name if cursor (x,y) is within its circle, else null
 function nodeAt(x, y) {
   for (const n of NODES) {
     const p = nodePos[n];
     if (!p) continue;
     const dx = p.x - x, dy = p.y - y;
-    if (dx*dx + dy*dy <= (NR + 5) * (NR + 5)) return n;
+    if (dx*dx + dy*dy <= (NR + 5) * (NR + 5)) return n; // circle hit test
   }
   return null;
 }
 
+// Returns the edge if cursor is within ~10px of it using point-to-line distance
 function edgeAt(x, y) {
   for (const e of DRAW_EDGES) {
     const a = nodePos[e.from], b = nodePos[e.to];
     if (!a || !b) continue;
     const dx = b.x - a.x, dy = b.y - a.y;
     const len2 = dx*dx + dy*dy;
+    // t = how far along the line segment the closest point is (0=start, 1=end)
     const t = Math.max(0, Math.min(1, ((x-a.x)*dx + (y-a.y)*dy) / len2));
     const px = a.x + t*dx - x, py = a.y + t*dy - y;
-    if (px*px + py*py < 100 && t > 0.15 && t < 0.85) return e;
+    if (px*px + py*py < 100 && t > 0.15 && t < 0.85) return e; // within 10px
   }
   return null;
 }
 
+// Show the tooltip div at cursor position with given HTML content
 function showTip(x, y, html) {
   tip.innerHTML = html;
-  const rect = canvas.getBoundingClientRect();
   const W = canvas.clientWidth, H = canvas.clientHeight;
   const tw = 170, th = 100;
+  // Flip tooltip left if it would go off the right edge
   const lx = x + 18 + tw > W ? x - tw - 14 : x + 18;
   const ly = y + th > H ? y - th : y;
   tip.style.left = lx + 'px';
@@ -862,17 +891,20 @@ function showTip(x, y, html) {
 
 function hideTip() { tip.classList.remove('show'); }
 
+// Mouse move: handle dragging or show tooltip for node/edge under cursor
 canvas.addEventListener('mousemove', e => {
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
 
   if (dragging) {
+    // Move the dragged node to follow the cursor (minus the grab offset)
     nodePos[dragging] = {x: x - dox, y: y - doy};
     drawGraph();
     return;
   }
 
+  // Check if hovering a node
   const node = nodeAt(x, y);
   if (node) {
     canvas.style.cursor = 'grab';
@@ -884,6 +916,7 @@ canvas.addEventListener('mousemove', e => {
     return;
   }
 
+  // Check if hovering an edge
   const edge = edgeAt(x, y);
   if (edge) {
     canvas.style.cursor = 'pointer';
@@ -900,17 +933,25 @@ canvas.addEventListener('mousemove', e => {
   hideTip();
 });
 
+// On click down: start dragging if cursor is over a node
 canvas.addEventListener('mousedown', e => {
   const rect = canvas.getBoundingClientRect();
   const x = e.clientX - rect.left;
   const y = e.clientY - rect.top;
   const n = nodeAt(x, y);
-  if (n) { dragging = n; dox = x - nodePos[n].x; doy = y - nodePos[n].y; }
+  if (n) {
+    dragging = n;
+    dox = x - nodePos[n].x; // offset so node doesn't snap to cursor center
+    doy = y - nodePos[n].y;
+  }
 });
 
 canvas.addEventListener('mouseup',    () => { dragging = null; canvas.style.cursor = 'crosshair'; });
 canvas.addEventListener('mouseleave', () => { dragging = null; hideTip(); });
 
+// ═══════════════════════════════════════
+//  Q & A
+// ═══════════════════════════════════════
 
 const QA = [
   {
@@ -955,6 +996,7 @@ const QA = [
   },
 ];
 
+// Build the Q&A accordion items from the QA array
 function buildQA() {
   const container = document.getElementById('qa-list');
   container.innerHTML = QA.map((item, i) => `
@@ -970,10 +1012,12 @@ function buildQA() {
   `).join('');
 }
 
+// Toggle a single Q&A item open/closed
 function toggleQA(i) {
   document.getElementById(`qa-${i}`).classList.toggle('open');
 }
 
+// Toggle the entire Q&A section visible/hidden
 function toggleQAPanel() {
   const list  = document.getElementById('qa-list');
   const arrow = document.getElementById('qa-panel-arrow');
@@ -982,13 +1026,15 @@ function toggleQAPanel() {
   arrow.style.transform = isHidden ? 'rotate(90deg)' : 'rotate(0deg)';
 }
 
-
-populateSelects();
-buildQA();
-buildEdgeTable();
-document.getElementById('edge-count').textContent = DRAW_EDGES.length;
-resizeCanvas();
-window.addEventListener('resize', resizeCanvas);
+// ═══════════════════════════════════════
+//  INIT — run everything on page load
+// ═══════════════════════════════════════
+populateSelects();                                               // fill dropdowns
+buildQA();                                                       // render Q&A items
+buildEdgeTable();                                                // render connections table
+document.getElementById('edge-count').textContent = DRAW_EDGES.length; // show edge count in header
+resizeCanvas();                                                  // draw the graph
+window.addEventListener('resize', resizeCanvas);                // redraw on window resize
 </script>
 </body>
 </html>
