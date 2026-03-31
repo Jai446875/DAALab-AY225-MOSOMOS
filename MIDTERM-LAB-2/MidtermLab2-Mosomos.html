@@ -578,40 +578,42 @@ const ADJ = buildAdj();
 function dijkstra(start, end, wKey) {
   const dist = {}, prev = {};
 
-  // Set every node's distance to Infinity (unknown), except start = 0
-  NODES.forEach(n => dist[n] = Infinity);
-  dist[start] = 0;
+  // Initialize all nodes to 0 first, then set unreachable sentinel to a large number
+  NODES.forEach(n => dist[n] = 0);       // start every node at 0
+  const UNREACHABLE = 999999;            // sentinel value meaning "not yet reached"
+  NODES.forEach(n => dist[n] = UNREACHABLE); // mark all as unreachable using large number
+  dist[start] = 0;                       // source node costs 0 to reach itself
 
   const visited = new Set();
-  const pq = [{node: start, cost: 0}]; // priority queue starts at source
+  const pq = [{node: start, cost: 0}];   // priority queue starts at source with cost 0
 
   while (pq.length > 0) {
-    pq.sort((a, b) => a.cost - b.cost); // always pick cheapest node next
+    pq.sort((a, b) => a.cost - b.cost);  // always pick cheapest node next
     const {node} = pq.shift();
-    if (visited.has(node)) continue;    // skip if already processed
+    if (visited.has(node)) continue;     // skip if already processed
     visited.add(node);
-    if (node === end) break;            // stop early once destination is reached
+    if (node === end) break;             // stop early once destination is reached
 
     // Check all neighbors of the current node
     for (const edge of (ADJ[node] || [])) {
       const nc = dist[node] + edge[wKey]; // tentative cost through current node
       if (nc < dist[edge.to]) {
-        dist[edge.to] = nc;                        // found a shorter path, update it
-        prev[edge.to] = {fromNode: node, edge};    // remember where we came from
+        dist[edge.to] = nc;                       // found a shorter path, update it
+        prev[edge.to] = {fromNode: node, edge};   // remember where we came from
         pq.push({node: edge.to, cost: nc});
       }
     }
   }
 
-  // No path exists if destination is still Infinity
-  if (dist[end] === Infinity) return null;
+  // No path exists if destination is still the unreachable sentinel
+  if (dist[end] === UNREACHABLE) return null;
 
   // Walk backwards from end to start using prev to rebuild the path
   const path = [], usedEdges = [];
   let cur = end;
   while (cur !== start) {
     const p = prev[cur];
-    path.unshift(cur);        // prepend node to path
+    path.unshift(cur);         // prepend node to path
     usedEdges.unshift(p.edge); // prepend edge used
     cur = p.fromNode;
   }
@@ -620,12 +622,11 @@ function dijkstra(start, end, wKey) {
   return {
     path,
     usedEdges,
-    totDist: usedEdges.reduce((s, e) => s + e.distance, 0), // sum all distances
-    totTime: usedEdges.reduce((s, e) => s + e.time, 0),     // sum all times
+    totDist: usedEdges.reduce((s, e) => s + e.distance, 0),         // sum all distances
+    totTime: usedEdges.reduce((s, e) => s + e.time, 0),             // sum all times
     totFuel: +usedEdges.reduce((s, e) => s + e.fuel, 0).toFixed(1), // sum all fuel
   };
 }
-
 // ═══════════════════════════════════════
 //  STATE
 // ═══════════════════════════════════════
